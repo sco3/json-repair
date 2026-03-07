@@ -1,0 +1,14 @@
+{
+  "single_trailing_array": [1,],
+  "single_trailing_object": {"a": 1,},
+  "multiple_nested": {
+    "level1": {
+      "level2": {
+        "level3": [1, 2,],
+      },
+    },
+  },
+  "mixed": [1, {"a": 2,}, 3,],
+  "string_with_comma": "hello, world",
+  "escaped_string": "test\"value",
+}

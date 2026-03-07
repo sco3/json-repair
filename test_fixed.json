@@ -1,0 +1,9 @@
+{
+  "asdf": [1, 2, 3, 4],
+  "jkl": "qwertry",
+  "a": true,
+  "nested": {
+    "items": ["x", "y", "z"],
+    "count": 42},
+  "empty_array": [],
+  "empty_object": {}}
