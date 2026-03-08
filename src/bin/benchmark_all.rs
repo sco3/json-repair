@@ -264,7 +264,7 @@ mod rust_no_val {
 
 fn generate_test_data(size: usize, error_type: &str) -> Vec<u8> {
     let mut s = String::with_capacity(size);
-    
+
     match error_type {
         "trailing_comma" => {
             s.push_str("{'items':[");
@@ -277,19 +277,23 @@ fn generate_test_data(size: usize, error_type: &str) -> Vec<u8> {
             s.push_str("],}");
         }
         "single_quotes" => {
-            s.push_str("{'key':'value'");
+            s.push_str("{'key_0':'value_0'");
             let mut depth = 1;
+            let mut i = 1;
             while s.len() < size - 30 {
-                s.push_str(",'nested':{'a':'b'");
+                s.push_str(&format!(",'nested_{}_{}':{{'a_{}':'b_{}'", depth, i, i, i));
                 depth += 1;
+                i += 1;
             }
             s.push_str(&"}".repeat(depth));
             s.push('}');
         }
         "mixed" => {
-            s.push_str("{'items':[1,2,3,],'name':'test'");
+            s.push_str("{'items_0':[1,2,3,],'name_0':'test_0'");
+            let mut i = 1;
             while s.len() < size - 50 {
-                s.push_str(",'extra':{'a':[1,]}");
+                s.push_str(&format!(",'extra_{}_{}':{{'a_{}':[1,]}}", i, i, i));
+                i += 1;
             }
             s.push('}');
         }
@@ -305,7 +309,7 @@ fn generate_test_data(size: usize, error_type: &str) -> Vec<u8> {
         }
         _ => {}
     }
-    
+
     s.into_bytes()
 }
 
@@ -394,8 +398,8 @@ print(f"{{elapsed*1000/iters:.6}},{{success}}")
 }
 
 fn main() {
-    let warmup = 100;
-    let iterations = 1000;
+    let warmup = 1000;
+    let iterations = 3000;
     
     println!("╔══════════════════════════════════════════════════════════════════════════════╗");
     println!("║         Python vs Rust Single-Pass Performance Benchmark (Rust native)       ║");
@@ -485,9 +489,9 @@ fn main() {
     
     for (error_type, _) in &test_cases {
         let data = generate_test_data(10000, error_type);
-        let (py, _) = benchmark_python(&data, 10, 100);
-        let (rv, _) = benchmark_rust(rust_val::repair_json, &data, 10, 100);
-        let (rnv, _) = benchmark_rust(rust_no_val::repair_json, &data, 10, 100);
+        let (py, _) = benchmark_python(&data, 100, 1000);
+        let (rv, _) = benchmark_rust(rust_val::repair_json, &data, 100, 1000);
+        let (rnv, _) = benchmark_rust(rust_no_val::repair_json, &data, 100, 1000);
         total_py += py;
         total_rust_val += rv;
         total_rust_nv += rnv;

@@ -108,28 +108,38 @@ Repairs broken JSON with final serde_json validation.
 
 Benchmark comparing Python vs Rust single-pass implementation:
 
-| Size | Type | Python (ms) | Rust (ms) | Speedup |
-|------|------|-------------|-----------|---------|
-| 1KB | mixed | 0.0127 | 0.0036 | 3.5x |
-| 10KB | trailing_comma | 0.0789 | 0.0237 | 3.3x |
-| 10KB | single_quotes | 0.0264 | 0.0370 | 0.7x |
-| 10KB | mixed | 0.1059 | 0.0359 | 3.0x |
-| 10KB | valid | 0.0225 | 0.0075 | 3.0x |
-| 100KB | mixed | 1.0600 | 0.3626 | 2.9x |
-| 500KB | mixed | 6.9942 | 1.8134 | 3.9x |
+#### By Error Type (10KB)
+
+| Error Type | Python (ms) | Rust val (ms) | Rust no-val (ms) | Speedup |
+|------------|-------------|---------------|------------------|---------|
+| Trailing Commas | 0.0790 | 0.0238 | 0.0152 | 3.3x / 5.2x |
+| Single Quotes | 0.0203 | 0.0293 | 0.0180 | 0.7x / 1.1x |
+| Mixed Issues | 0.0853 | 0.0307 | 0.0202 | 2.8x / 4.2x |
+| Valid JSON | 0.0227 | 0.0089 | 0.0074 | 2.6x / 3.1x |
+
+#### By Size (Mixed Errors)
+
+| Size | Python (ms) | Rust val (ms) | Rust no-val (ms) | Speedup |
+|------|-------------|---------------|------------------|---------|
+| 1KB | 0.0104 | 0.0031 | 0.0019 | 3.3x / 5.5x |
+| 10KB | 0.0849 | 0.0306 | 0.0207 | 2.8x / 4.1x |
+| 100KB | 1.0363 | 0.2930 | 0.1921 | 3.5x / 5.4x |
+| 500KB | 5.4999 | 1.4280 | 0.9585 | 3.9x / 5.7x |
 
 **Overall Summary:**
 
-| Implementation | Avg Time (ms) | Speedup vs Python |
-|----------------|---------------|-------------------|
-| Python (two-pass) | 0.2469 | — |
-| Rust single-pass | 0.1337 | **1.8x** |
+| Implementation | Total Time (ms) | Speedup vs Python |
+|----------------|-----------------|-------------------|
+| Python (two-pass) | 0.2086 | — |
+| Rust + validation | 0.0915 | **2.3x** |
+| Rust (no validation) | 0.0627 | **3.3x** |
 
 ### Key Performance Insights
 
 1. **Single-pass advantage**: Rust processes input once, Python does two passes (repair + validate)
-2. **Scale benefits**: Speedup increases with input size (3.9x at 500KB)
-3. **Memory efficiency**: No intermediate token/AST allocation in single-pass
+2. **Scale benefits**: Speedup increases with input size (up to 5.7x at 500KB)
+3. **Validation overhead**: serde_json validation adds ~0.03ms; pure single-pass is fastest
+4. **Memory efficiency**: No intermediate token/AST allocation in single-pass
 
 ### Run Benchmarks
 
