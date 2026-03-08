@@ -24,9 +24,12 @@ fn main() {
         }
     };
 
+    // Convert to bytes for the repair function
+    let input_bytes = input.as_bytes();
+
     // Warmup phase (not measured)
     for _ in 0..warmup_iters {
-        let _ = repair_json(&input);
+        let _ = repair_json(input_bytes);
     }
 
     // Benchmark phase (measured)
@@ -35,7 +38,7 @@ fn main() {
     let mut error_count = 0;
 
     for _ in 0..benchmark_iters {
-        match repair_json(&input) {
+        match repair_json(input_bytes) {
             Ok(_) => success_count += 1,
             Err(_) => error_count += 1,
         }

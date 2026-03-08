@@ -1,126 +1,152 @@
-use actson::{feeder::SliceJsonFeeder, options::JsonParserOptionsBuilder, JsonParser};
+use serde::de::IgnoredAny;
 use std::fs;
 
 /// Repairs broken JSON by removing trailing commas in arrays and objects.
-/// Uses a streaming approach to detect and remove trailing commas before parsing.
+/// Uses a single-pass streaming approach with integrated structural validation.
 fn repair_json(input: &str) -> Result<String, String> {
     let mut output = String::with_capacity(input.len());
     let mut chars = input.chars().peekable();
-    
+
     // Stack to track container types: true = array, false = object
     let mut container_stack: Vec<bool> = Vec::new();
-    
+
     // Track if we're inside a string
     let mut in_string = false;
     let mut escape_next = false;
-    
+    // Track which quote type opened the string
+    let mut string_quote: Option<char> = None;
+
     // Track position of last comma - only remove if followed by ] or }
     let mut last_comma_pos: Option<usize> = None;
-    
+
     while let Some(c) = chars.next() {
-        if escape_next {
-            output.push(c);
-            escape_next = false;
-            continue;
-        }
-        
         if in_string {
-            output.push(c);
+            // Inside a string - handle escape sequences and quotes
+            if escape_next {
+                // Previous character was a backslash
+                if c == '\'' && string_quote == Some('\'') {
+                    // Escaped single quote in single-quoted string: \'
+                    // In output (double-quoted), single quotes don't need escaping
+                    // Remove the backslash from output
+                    output.truncate(output.len().saturating_sub(1));
+                    output.push(c); // Keep the single quote as-is
+                } else {
+                    // Other escape sequences - keep as-is
+                    output.push(c);
+                }
+                escape_next = false;
+                continue;
+            }
+
             if c == '\\' {
                 escape_next = true;
-            } else if c == '"' {
+                output.push(c);
+            } else if Some(c) == string_quote {
+                // End of string - convert to double quote in output
                 in_string = false;
+                string_quote = None;
+                output.push('"');
+            } else if c == '"' && string_quote == Some('\'') {
+                // Double quote inside single-quoted string - escape it
+                output.push('\\');
+                output.push('"');
+            } else {
+                output.push(c);
             }
             continue;
         }
-        
+
         match c {
+            '\'' => {
+                // Start of string with single quote - convert to double quote
+                output.push('"');
+                in_string = true;
+                string_quote = Some('\'');
+                last_comma_pos = None;
+            }
             '"' => {
                 output.push(c);
                 in_string = true;
-                // Comma before a key is valid (between key-value pairs)
+                string_quote = Some('"');
                 last_comma_pos = None;
             }
             '[' => {
                 output.push(c);
-                container_stack.push(true); // true = array
+                container_stack.push(true);
                 last_comma_pos = None;
             }
             ']' => {
-                // Remove trailing comma before closing bracket
+                if container_stack.last() != Some(&true) {
+                    continue;
+                }
                 if let Some(pos) = last_comma_pos.take() {
                     output.truncate(pos);
                 }
                 output.push(c);
-                if container_stack.last() == Some(&true) {
-                    container_stack.pop();
-                }
+                container_stack.pop();
                 last_comma_pos = None;
             }
             '{' => {
                 output.push(c);
-                container_stack.push(false); // false = object
+                container_stack.push(false);
                 last_comma_pos = None;
             }
             '}' => {
-                // Remove trailing comma before closing brace
+                if container_stack.last() != Some(&false) {
+                    continue;
+                }
                 if let Some(pos) = last_comma_pos.take() {
                     output.truncate(pos);
                 }
                 output.push(c);
-                if container_stack.last() == Some(&false) {
-                    container_stack.pop();
-                }
+                container_stack.pop();
                 last_comma_pos = None;
             }
             ',' => {
-                // Mark this comma position - will be removed if next non-whitespace is ] or }
+                // Always record comma position - will be removed if next non-whitespace is ] or }
                 last_comma_pos = Some(output.len());
                 output.push(c);
             }
             ':' => {
-                // Colon means we're seeing a key-value separator
-                // Comma before colon in object is valid (between pairs)
+                // Colon means key-value separator - clear trailing comma marker
                 last_comma_pos = None;
                 output.push(c);
             }
             _ => {
-                // Whitespace or value characters (numbers, true, false, null)
-                // If it's a value character, the comma before it is valid
+                // Whitespace or value characters
                 if !c.is_whitespace() {
+                    // Non-whitespace value character - clear trailing comma marker
                     last_comma_pos = None;
                 }
                 output.push(c);
             }
         }
     }
-    
+
     // Final cleanup: remove any trailing comma at the end
     if let Some(pos) = last_comma_pos.take() {
         output.truncate(pos);
     }
-    
-    // Validate the repaired JSON using actson
-    validate_json(&output)?;
-    
+
+    // Final structural validation: all containers must be closed
+    if !container_stack.is_empty() {
+        return Err(format!(
+            "Unclosed containers: {} unclosed brackets",
+            container_stack.len()
+        ));
+    }
+
+    // Validate the repaired JSON using serde_json (fast check)
+    if !is_valid_json(&output) {
+        return Err("Invalid JSON structure after repair".to_string());
+    }
+
     Ok(output)
 }
 
-/// Validate that the output is valid JSON using actson
-fn validate_json(input: &str) -> Result<(), String> {
-    let options = JsonParserOptionsBuilder::default().build();
-    let feeder = SliceJsonFeeder::new(input.as_bytes());
-    let mut parser = JsonParser::new_with_options(feeder, options);
-    
-    loop {
-        match parser.next_event() {
-            Ok(Some(_)) => continue,
-            Ok(None) => break,
-            Err(e) => return Err(format!("Invalid JSON: {:?}", e)),
-        }
-    }
-    
-    Ok(())
+/// Fast validation using serde_json with IgnoredAny (doesn't build full values)
+fn is_valid_json(input: &str) -> bool {
+    serde_json::from_str::<IgnoredAny>(input).is_ok()
 }
 
 fn main() {

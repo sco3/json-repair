@@ -191,6 +191,7 @@ version = "0.1.0"
 dependencies = [
  "actson",
  "aws-smithy-json",
+ "bytes",
  "serde",
  "serde_json",
 ]
