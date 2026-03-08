@@ -65,18 +65,11 @@ repair_json('{"valid": true}')  # '{"valid": true}'
 ### Rust
 
 ```rust
-use repair_json::{repair_json, repair_json_aws_smithy};
+use repair_json::repair_json;
 
 let input = br#"{"items":[1,2,3,],"name":"test"}"#;
 
-// With final validation (safer)
 match repair_json(input) {
-    Ok(output) => println!("Repaired: {}", String::from_utf8_lossy(&output)),
-    Err(e) => eprintln!("Error: {}", e),
-}
-
-// Without final validation (faster, ~30% speedup)
-match repair_json_aws_smithy(input) {
     Ok(output) => println!("Repaired: {}", String::from_utf8_lossy(&output)),
     Err(e) => eprintln!("Error: {}", e),
 }
@@ -109,51 +102,34 @@ Repairs broken JSON with final serde_json validation.
 - `Ok(Vec<u8>)`: Repaired JSON bytes
 - `Err(String)`: Error message if repair fails
 
-#### `repair_json_aws_smithy(input: &[u8]) -> Result<Vec<u8>, String>`
-
-Repairs broken JSON **without** final validation (faster).
-
-**Args:**
-- `input`: Input bytes (invalid JSON)
-
-**Returns:**
-- `Ok(Vec<u8>)`: Repaired JSON bytes
-- `Err(String)`: Error message if structural validation fails
-
-**When to use each:**
-- Use `repair_json` for production/critical data (extra safety)
-- Use `repair_json_aws_smithy` for performance-critical scenarios
-
 ## Performance
 
 ### Python vs Rust Single-Pass Comparison
 
-Benchmark comparing Python (two-pass) vs Rust single-pass implementations:
+Benchmark comparing Python vs Rust single-pass implementation:
 
-| Size | Type | Python (ms) | Rust (val) | Rust (no val) | Speedup (val) | Speedup (no val) |
-|------|------|-------------|------------|---------------|---------------|------------------|
-| 1KB | mixed | 0.0127 | 0.0036 | 0.0022 | 3.5x | 5.9x |
-| 10KB | trailing_comma | 0.0789 | 0.0237 | 0.0149 | 3.3x | 5.3x |
-| 10KB | single_quotes | 0.0264 | 0.0370 | 0.0199 | 0.7x | 1.3x |
-| 10KB | mixed | 0.1059 | 0.0359 | 0.0218 | 3.0x | 4.9x |
-| 10KB | valid | 0.0225 | 0.0075 | 0.0076 | 3.0x | 3.0x |
-| 100KB | mixed | 1.0600 | 0.3626 | 0.2194 | 2.9x | 4.8x |
-| 500KB | mixed | 6.9942 | 1.8134 | 1.1025 | 3.9x | 6.3x |
+| Size | Type | Python (ms) | Rust (ms) | Speedup |
+|------|------|-------------|-----------|---------|
+| 1KB | mixed | 0.0127 | 0.0036 | 3.5x |
+| 10KB | trailing_comma | 0.0789 | 0.0237 | 3.3x |
+| 10KB | single_quotes | 0.0264 | 0.0370 | 0.7x |
+| 10KB | mixed | 0.1059 | 0.0359 | 3.0x |
+| 10KB | valid | 0.0225 | 0.0075 | 3.0x |
+| 100KB | mixed | 1.0600 | 0.3626 | 2.9x |
+| 500KB | mixed | 6.9942 | 1.8134 | 3.9x |
 
 **Overall Summary:**
 
 | Implementation | Avg Time (ms) | Speedup vs Python |
 |----------------|---------------|-------------------|
 | Python (two-pass) | 0.2469 | — |
-| Rust single-pass (with validation) | 0.1337 | **1.8x** |
-| Rust single-pass (no validation) | 0.0969 | **2.5x** |
+| Rust single-pass | 0.1337 | **1.8x** |
 
 ### Key Performance Insights
 
 1. **Single-pass advantage**: Rust processes input once, Python does two passes (repair + validate)
-2. **Validation overhead**: Final serde_json validation adds ~30% overhead but provides safety
-3. **Scale benefits**: Speedup increases with input size (6.3x at 500KB)
-4. **Memory efficiency**: No intermediate token/AST allocation in single-pass
+2. **Scale benefits**: Speedup increases with input size (3.9x at 500KB)
+3. **Memory efficiency**: No intermediate token/AST allocation in single-pass
 
 ### Run Benchmarks
 
@@ -179,7 +155,7 @@ The Rust implementation uses a streaming byte-by-byte approach:
    - Handling escape sequences (`\'` → `'`)
    - Validating bracket matching on-the-fly
 3. **Structural check**: Ensure all containers are closed
-4. **Optional validation**: Final serde_json check (skipped in `aws_smithy` variant)
+4. **Final validation**: serde_json check to ensure valid output
 
 ### Escape Sequence Handling
 

@@ -6,11 +6,7 @@ fn is_valid_json(input: &[u8]) -> bool {
 }
 
 /// Internal repair implementation.
-/// 
-/// # Arguments
-/// * `input` - The input bytes to repair
-/// * `validate` - If true, performs final serde_json validation
-fn repair_json_impl(input: &[u8], validate: bool) -> Result<Vec<u8>, String> {
+fn repair_json_impl(input: &[u8]) -> Result<Vec<u8>, String> {
     // Fast path: if already valid JSON, return as-is
     if is_valid_json(input) {
         return Ok(input.to_vec());
@@ -158,8 +154,8 @@ fn repair_json_impl(input: &[u8], validate: bool) -> Result<Vec<u8>, String> {
         ));
     }
 
-    // Optional final validation using serde_json
-    if validate && !is_valid_json(&output) {
+    // Final validation using serde_json
+    if !is_valid_json(&output) {
         return Err("Invalid JSON structure after repair".to_string());
     }
 
@@ -177,18 +173,6 @@ fn repair_json_impl(input: &[u8], validate: bool) -> Result<Vec<u8>, String> {
 /// - Validates bracket matching and string termination on-the-fly
 /// - Performs final serde_json validation as a safety check
 pub fn repair_json(input: &[u8]) -> Result<Vec<u8>, String> {
-    repair_json_impl(input, true)
+    repair_json_impl(input)
 }
 
-/// Repairs broken JSON by removing trailing commas in arrays and objects
-/// and converting single quotes to double quotes.
-/// Uses a single-pass streaming approach with integrated structural validation.
-/// Works with bytes directly to avoid string conversion overhead.
-///
-/// # Single-Pass Design
-/// - Same algorithm as repair_json but without final serde_json validation
-/// - Relies entirely on integrated structural validation
-/// - Faster than repair_json as it skips the final validation check
-pub fn repair_json_aws_smithy(input: &[u8]) -> Result<Vec<u8>, String> {
-    repair_json_impl(input, false)
-}

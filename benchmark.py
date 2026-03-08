@@ -49,12 +49,9 @@ class BenchmarkResult:
     test_type: str
     python_ms: float
     rust_actson_ms: float
-    rust_aws_smithy_ms: float
     speedup_actson: float
-    speedup_aws_smithy: float
     python_success: int
     rust_actson_success: int
-    rust_aws_smithy_success: int
 
 
 def benchmark_python(json_str: str, warmup: int = 1000, iterations: int = 3000) -> tuple[float, int]:
@@ -130,7 +127,7 @@ def run_benchmarks():
     iterations = 100
 
     print("=" * 120)
-    print(f"JSON Repair Benchmark: Python vs Rust (actson) vs Rust (aws-smithy-json)")
+    print(f"JSON Repair Benchmark: Python vs Rust (actson)")
     print(f"warmup={warmup}, iterations={iterations}")
     print("=" * 120)
     print()
@@ -158,36 +155,22 @@ def run_benchmarks():
                 rust_actson_success = 0
                 print(f"Rust actson error ({name}, {size}): {e}")
 
-            # Rust aws_smithy benchmark
-            try:
-                rust_aws_smithy_time, rust_aws_smithy_success = benchmark_rust("benchmark_aws_smithy", json_str, warmup, iterations)
-            except Exception as e:
-                rust_aws_smithy_time = float('inf')
-                rust_aws_smithy_success = 0
-                print(f"Rust aws_smithy error ({name}, {size}): {e}")
-
             speedup_actson = python_time / rust_actson_time if rust_actson_time > 0 else float('inf')
-            speedup_aws_smithy = python_time / rust_aws_smithy_time if rust_aws_smithy_time > 0 else float('inf')
 
             results.append(BenchmarkResult(
                 size=actual_size,
                 test_type=name,
                 python_ms=python_time,
                 rust_actson_ms=rust_actson_time,
-                rust_aws_smithy_ms=rust_aws_smithy_time,
                 speedup_actson=speedup_actson,
-                speedup_aws_smithy=speedup_aws_smithy,
                 python_success=python_success,
                 rust_actson_success=rust_actson_success,
-                rust_aws_smithy_success=rust_aws_smithy_success,
             ))
 
             status_actson = "✓" if rust_actson_success == iterations else "✗"
-            status_aws = "✓" if rust_aws_smithy_success == iterations else "✗"
             print(f"Size: {actual_size:7d} | Type: {name:15s} | "
                   f"Python: {python_time:8.4f}ms | "
-                  f"Actson: {rust_actson_time:8.4f}ms {status_actson} ({speedup_actson:6.2f}x) | "
-                  f"AWS Smithy: {rust_aws_smithy_time:8.4f}ms {status_aws} ({speedup_aws_smithy:6.2f}x)")
+                  f"Actson: {rust_actson_time:8.4f}ms {status_actson} ({speedup_actson:6.2f}x)")
     
     print()
     print("=" * 120)
@@ -199,16 +182,12 @@ def run_benchmarks():
         type_results = [r for r in results if r.test_type == name]
         avg_python = sum(r.python_ms for r in type_results) / len(type_results)
         avg_actson = sum(r.rust_actson_ms for r in type_results) / len(type_results)
-        avg_aws_smithy = sum(r.rust_aws_smithy_ms for r in type_results) / len(type_results)
         avg_speedup_actson = avg_python / avg_actson if avg_actson > 0 else float('inf')
-        avg_speedup_aws_smithy = avg_python / avg_aws_smithy if avg_aws_smithy > 0 else float('inf')
         total_python_success = sum(r.python_success for r in type_results)
         total_actson_success = sum(r.rust_actson_success for r in type_results)
-        total_aws_success = sum(r.rust_aws_smithy_success for r in type_results)
         max_success = len(type_results) * iterations
         print(f"{name:15s}: Python: {avg_python:8.4f}ms | "
-              f"Actson: {avg_actson:8.4f}ms ({avg_speedup_actson:6.2f}x) | "
-              f"AWS Smithy: {avg_aws_smithy:8.4f}ms ({avg_speedup_aws_smithy:6.2f}x)")
+              f"Actson: {avg_actson:8.4f}ms ({avg_speedup_actson:6.2f}x)")
 
     print()
     print("=" * 120)
@@ -220,16 +199,12 @@ def run_benchmarks():
         size_results = [r for r in results if r.size == size]
         avg_python = sum(r.python_ms for r in size_results) / len(size_results)
         avg_actson = sum(r.rust_actson_ms for r in size_results) / len(size_results)
-        avg_aws_smithy = sum(r.rust_aws_smithy_ms for r in size_results) / len(size_results)
         avg_speedup_actson = avg_python / avg_actson if avg_actson > 0 else float('inf')
-        avg_speedup_aws_smithy = avg_python / avg_aws_smithy if avg_aws_smithy > 0 else float('inf')
         total_python_success = sum(r.python_success for r in size_results)
         total_actson_success = sum(r.rust_actson_success for r in size_results)
-        total_aws_success = sum(r.rust_aws_smithy_success for r in size_results)
         max_success = len(size_results) * iterations
         print(f"Size {size:7d}: Python: {avg_python:8.4f}ms | "
-              f"Actson: {avg_actson:8.4f}ms ({avg_speedup_actson:6.2f}x) | "
-              f"AWS Smithy: {avg_aws_smithy:8.4f}ms ({avg_speedup_aws_smithy:6.2f}x)")
+              f"Actson: {avg_actson:8.4f}ms ({avg_speedup_actson:6.2f}x)")
 
     print()
     print("=" * 120)
@@ -239,24 +214,20 @@ def run_benchmarks():
     # Overall averages
     avg_python = sum(r.python_ms for r in results) / len(results)
     avg_actson = sum(r.rust_actson_ms for r in results) / len(results)
-    avg_aws_smithy = sum(r.rust_aws_smithy_ms for r in results) / len(results)
     overall_speedup_actson = avg_python / avg_actson if avg_actson > 0 else float('inf')
-    overall_speedup_aws_smithy = avg_python / avg_aws_smithy if avg_aws_smithy > 0 else float('inf')
     total_python_success = sum(r.python_success for r in results)
     total_actson_success = sum(r.rust_actson_success for r in results)
-    total_aws_success = sum(r.rust_aws_smithy_success for r in results)
     max_success = len(results) * iterations
 
     print(f"Python:          {avg_python:8.4f}ms ({total_python_success}/{max_success})")
     print(f"Rust Actson:     {avg_actson:8.4f}ms ({total_actson_success}/{max_success}) - Speedup: {overall_speedup_actson:6.2f}x")
-    print(f"Rust AWS Smithy: {avg_aws_smithy:8.4f}ms ({total_aws_success}/{max_success}) - Speedup: {overall_speedup_aws_smithy:6.2f}x")
 
     # Save results to CSV
     csv_path = Path("benchmark_results.csv")
     with open(csv_path, 'w') as f:
-        f.write("size,type,python_ms,rust_actson_ms,rust_aws_smithy_ms,speedup_actson,speedup_aws_smithy,python_success,actson_success,aws_smithy_success,iterations\n")
+        f.write("size,type,python_ms,rust_actson_ms,speedup_actson,python_success,actson_success,iterations\n")
         for r in results:
-            f.write(f"{r.size},{r.test_type},{r.python_ms:.6f},{r.rust_actson_ms:.6f},{r.rust_aws_smithy_ms:.6f},{r.speedup_actson:.2f},{r.speedup_aws_smithy:.2f},{r.python_success},{r.rust_actson_success},{r.rust_aws_smithy_success},{iterations}\n")
+            f.write(f"{r.size},{r.test_type},{r.python_ms:.6f},{r.rust_actson_ms:.6f},{r.speedup_actson:.2f},{r.python_success},{r.rust_actson_success},{iterations}\n")
     print(f"\nResults saved to: {csv_path}")
 
 
